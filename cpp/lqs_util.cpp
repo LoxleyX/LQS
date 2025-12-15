@@ -20,7 +20,7 @@
 ************************************************************************/
 #include "map/utils/moduleutils.h"
 
-#include "common/sql.h"
+#include "common/database.h"
 #include "common/lua.h"
 #include "map/utils/charutils.h"
 #include "map/utils/itemutils.h"
@@ -28,30 +28,13 @@
 #include "map/trade_container.h"
 
 #include "map/lua/lua_baseentity.h"
-#include "map/packets/char_emotion.h"
-#include "map/packets/independent_animation.h"
-#include "map/packets/inventory_finish.h"
-#include "map/packets/entity_animation.h"
-#include "map/packets/chat_message.h"
-
-class CNpcEmotionPacket : public CBasicPacket
-{
-public:
-    CNpcEmotionPacket(CBaseEntity* PBaseEntity, uint32 TargetID, uint16 TargetIndex, Emote EmoteID, EmoteMode emoteMode, uint16 extra);
-};
-
-CNpcEmotionPacket::CNpcEmotionPacket(CBaseEntity* PBaseEntity, uint32 TargetID, uint16 TargetIndex, Emote EmoteID, EmoteMode emoteMode, uint16 extra)
-{
-    this->setType(0x5A);
-    this->setSize(0x70);
-
-    ref<uint32>(0x04) = PBaseEntity->id;
-    ref<uint32>(0x08) = TargetID;
-    ref<uint16>(0x0C) = PBaseEntity->targid;
-    ref<uint16>(0x0E) = TargetIndex;
-    ref<uint8>(0x10)  = static_cast<uint8>(EmoteID);
-    ref<uint8>(0x16)  = static_cast<uint8>(emoteMode);
-}
+#include "map/entities/npcentity.h"
+#include "map/enums/chat_message_type.h"
+#include "map/packets/s2c/0x017_chat_std.h"
+#include "map/packets/s2c/0x022_item_trade_res.h"
+#include "map/packets/s2c/0x038_schedulor.h"
+#include "map/packets/s2c/0x03a_magicschedulor.h"
+#include "map/packets/s2c/0x05a_motionmes.h"
 
 class LqsUtilModule : public CPPModule
 {
@@ -72,7 +55,7 @@ class LqsUtilModule : public CPPModule
             }
 
             CCharEntity* PChar = (CCharEntity*)PEntity;
-            PChar->pushPacket<CChatMessagePacket>(PChar, MESSAGE_NS_SAY, lua_fmt(message, va).c_str(), "");
+            PChar->pushPacket<GP_SERV_COMMAND_CHAT_STD>(PChar, MESSAGE_NS_SAY, lua_fmt(message, va).c_str(), "");
         };
 
         lua["CBaseEntity"]["sys"] = [this](CLuaBaseEntity* PLuaBaseEntity, std::string const& message, sol::variadic_args va) -> void
@@ -85,7 +68,7 @@ class LqsUtilModule : public CPPModule
             }
 
             CCharEntity* PChar = (CCharEntity*)PEntity;
-            PChar->pushPacket<CChatMessagePacket>(PChar, MESSAGE_SYSTEM_3, lua_fmt(message, va).c_str(), "");
+            PChar->pushPacket<GP_SERV_COMMAND_CHAT_STD>(PChar, MESSAGE_SYSTEM_3, lua_fmt(message, va).c_str(), "");
         };
 
         lua["CBaseEntity"]["tradeRelease"] = [this](CLuaBaseEntity* PLuaBaseEntity) -> void
@@ -111,7 +94,7 @@ class LqsUtilModule : public CPPModule
                 }
             }
             PChar->TradeContainer->Clean();
-            PChar->pushPacket<CInventoryFinishPacket>();
+            PChar->pushPacket<GP_SERV_COMMAND_ITEM_TRADE_RES>(PChar, GP_ITEM_TRADE_RES_KIND::End);
         };
 
         lua["CBaseEntity"]["canObtainItem"] = [this](CLuaBaseEntity* PLuaBaseEntity, uint16 itemID) -> bool
@@ -224,7 +207,15 @@ class LqsUtilModule : public CPPModule
             const auto emoteID   = static_cast<Emote>(emID);
             const auto emoteMode = static_cast<EmoteMode>(emMode);
 
-            PChar->pushPacket<CNpcEmotionPacket>(PEntity, PTarget->id, PTarget->targid, emoteID, emoteMode, 0);
+            // Check if the emoting entity is an NPC or player character
+            if (auto* PNpc = dynamic_cast<CNpcEntity*>(PEntity))
+            {
+                PChar->pushPacket<GP_SERV_COMMAND_MOTIONMES>(PNpc, PTarget->id, PTarget->targid, emoteID, emoteMode);
+            }
+            else if (auto* PCharActor = dynamic_cast<CCharEntity*>(PEntity))
+            {
+                PChar->pushPacket<GP_SERV_COMMAND_MOTIONMES>(PCharActor, PTarget->id, PTarget->targid, emoteID, emoteMode, 0);
+            }
         };
 
         lua["CBaseEntity"]["ceAnimate"] = [](CLuaBaseEntity* PLuaBaseEntity, CLuaBaseEntity* player, CLuaBaseEntity* target, uint16 animID, uint8 mode) -> void {
@@ -236,7 +227,7 @@ class LqsUtilModule : public CPPModule
 
             auto* const PChar = dynamic_cast<CCharEntity*>(PPlayer);
 
-            PChar->pushPacket<CIndependentAnimationPacket>(PEntity, PTarget, animID, mode);
+            PChar->pushPacket<GP_SERV_COMMAND_MAGICSCHEDULOR>(PEntity, PTarget, animID, static_cast<GP_SERV_COMMAND_MAGICSCHEDULOR_TYPE>(mode));
         };
 
         lua["CBaseEntity"]["ceAnimationPacket"] = [](CLuaBaseEntity* PLuaBaseEntity, CLuaBaseEntity* player, const char* command, CLuaBaseEntity* target) -> void {
@@ -250,7 +241,7 @@ class LqsUtilModule : public CPPModule
             if (target == nullptr)
             {
                 // If no target PEntity defaults to itself
-                PChar->pushPacket<CEntityAnimationPacket>(PEntity, PEntity, command);
+                PChar->pushPacket<GP_SERV_COMMAND_SCHEDULOR>(PEntity, PEntity, command);
             }
             else
             {
@@ -258,7 +249,7 @@ class LqsUtilModule : public CPPModule
                 if (PTarget != nullptr)
                 {
                     // If we have a target then set PTarget to that
-                    PChar->pushPacket<CEntityAnimationPacket>(PEntity, PTarget, command);
+                    PChar->pushPacket<GP_SERV_COMMAND_SCHEDULOR>(PEntity, PTarget, command);
                 }
             }
         };
