@@ -251,6 +251,34 @@ local processTable = function(player, npc, prefix, row, delay)
             player:delStatusEffect(row.removeEffect)
         end
 
+    -- Add Status Effect
+    -- Add a status effect to the player
+    elseif row.addEffect ~= nil then
+        if type(row.addEffect) == "number" then
+            -- Simple effect with defaults
+            player:addStatusEffect(row.addEffect, 0, 0, 3600)
+        elseif type(row.addEffect) == "table" then
+            local effect   = row.addEffect.effect
+            local power    = row.addEffect.power or 0
+            local tick     = row.addEffect.tick or 0
+            local duration = row.addEffect.duration or 3600
+            local subId    = row.addEffect.subId or 0
+            local subPower = row.addEffect.subPower or 0
+            local tier     = row.addEffect.tier or 0
+            local flags    = row.addEffect.flags or 0
+
+            -- Remove conflicting effects if requested (e.g., for Signet)
+            if row.addEffect.removeConflicting then
+                player:delStatusEffectsByFlag(xi.effectFlag.INFLUENCE, true)
+            end
+
+            if flags ~= 0 then
+                player:addStatusEffectEx(effect, effect, power, tick, duration, subId, subPower, tier, flags)
+            else
+                player:addStatusEffect(effect, power, tick, duration, subId, subPower, tier)
+            end
+        end
+
     elseif row.charvar ~= nil then
         player:setCharVar(row.charvar, row.value)
 
@@ -405,6 +433,33 @@ local processTable = function(player, npc, prefix, row, delay)
                 entity:ceDespawn(playerArg)
             end)
         end)
+
+    -- Teleport
+    -- Cross-zone or same-zone teleportation with optional delay
+    elseif row.teleport ~= nil then
+        local teleportDelay = row.teleportDelay or 0
+
+        if type(row.teleport) == "number" then
+            -- Using xi.teleport.id constant (e.g., xi.teleport.id.DEM, xi.teleport.id.OUTPOST)
+            local teleportId = row.teleport
+            local subPower   = row.region or 0
+
+            player:timer(teleportDelay, function(playerArg)
+                playerArg:addStatusEffectEx(xi.effect.TELEPORT, 0, teleportId, 0, 1, 0, subPower)
+            end)
+
+        elseif type(row.teleport) == "table" then
+            -- Direct coordinates: { x, y, z, rotation, zoneID }
+            player:timer(teleportDelay, function(playerArg)
+                if row.teleport[5] ~= nil then
+                    -- Cross-zone teleport
+                    playerArg:setPos(row.teleport[1], row.teleport[2], row.teleport[3], row.teleport[4], row.teleport[5])
+                else
+                    -- Same-zone teleport
+                    playerArg:setPos(row.teleport[1], row.teleport[2], row.teleport[3], row.teleport[4])
+                end
+            end)
+        end
     end
 end
 
@@ -1133,6 +1188,39 @@ local checkList =
 
     quest = function(player, questInfo)
         return player:hasCompletedQuest(questInfo[1], questInfo[2])
+    end,
+
+    -----------------------------------
+    -- Teleporter-related checks
+    -----------------------------------
+    gil = function(player, val)
+        return player:getGil() >= val
+    end,
+
+    cp = function(player, val)
+        return player:getCP() >= val
+    end,
+
+    rank = function(player, val)
+        if type(val) == "number" then
+            return player:getRank(player:getNation()) >= val
+        elseif type(val) == "table" then
+            return player:getRank(val[1]) >= val[2]
+        end
+        return false
+    end,
+
+    hasTeleport = function(player, val)
+        if type(val) == "number" then
+            return player:hasTeleport(player:getNation(), val + 5)
+        elseif type(val) == "table" then
+            return player:hasTeleport(val[1], val[2] + 5)
+        end
+        return false
+    end,
+
+    currency = function(player, val)
+        return player:getCurrency(val[1]) >= val[2]
     end,
 }
 
@@ -1878,6 +1966,431 @@ LQS.shop = function(obj)
 
         LQS.simpleShop(player, npc, list, purchase, fmt(obj.title, balance))
     end
+end
+
+-----------------------------------
+-- LQS.paginatedMenu
+-- General-purpose paginated menu builder
+-----------------------------------
+LQS.paginatedMenu = function(player, config)
+    local title        = config.title or "Select Option"
+    local items        = config.items or {}
+    local itemsPerPage = config.itemsPerPage or 5
+    local filter       = config.filter
+    local onSelect     = config.onSelect
+    local showNav      = config.showNavigation ~= false
+    local onCancel     = config.onCancel
+    local npc          = config.npc
+
+    -- Filter items if filter function provided
+    local filteredItems = {}
+    for _, item in ipairs(items) do
+        if filter == nil or filter(player, item) then
+            table.insert(filteredItems, item)
+        end
+    end
+
+    -- Return early if no items available
+    if #filteredItems == 0 then
+        if onCancel then
+            onCancel(player, "no_items")
+        end
+        return
+    end
+
+    local totalPages = math.ceil(#filteredItems / itemsPerPage)
+
+    local function showPage(pageNum)
+        local options  = {}
+        local startIdx = (pageNum - 1) * itemsPerPage + 1
+        local endIdx   = math.min(startIdx + itemsPerPage - 1, #filteredItems)
+
+        -- Previous page navigation
+        if showNav and pageNum > 1 then
+            table.insert(options, {
+                "(Prev)",
+                function(playerArg)
+                    showPage(pageNum - 1)
+                end
+            })
+        end
+
+        -- Add items for current page
+        for i = startIdx, endIdx do
+            local item  = filteredItems[i]
+            local label = item.label or item.name or item[1]
+
+            -- Allow label to be a function
+            if type(label) == "function" then
+                label = label(player, item)
+            end
+
+            table.insert(options, {
+                label,
+                function(playerArg)
+                    if onSelect then
+                        onSelect(playerArg, item, npc)
+                    end
+                end
+            })
+        end
+
+        -- Next page navigation
+        if showNav and pageNum < totalPages then
+            table.insert(options, {
+                "(Next)",
+                function(playerArg)
+                    showPage(pageNum + 1)
+                end
+            })
+        end
+
+        -- First page navigation (if more than 2 pages and not on first page)
+        if showNav and totalPages > 2 and pageNum > 1 then
+            table.insert(options, {
+                "(First)",
+                function(playerArg)
+                    showPage(1)
+                end
+            })
+        end
+
+        -- Cancel option
+        if onCancel then
+            table.insert(options, {
+                "Cancel",
+                function(playerArg)
+                    onCancel(playerArg, "cancelled")
+                end
+            })
+        end
+
+        -- Build title
+        local menuTitle = title
+        if type(title) == "function" then
+            menuTitle = title(pageNum, totalPages)
+        elseif totalPages > 1 then
+            menuTitle = string.format("%s (%d/%d)", title, pageNum, totalPages)
+        end
+
+        -- Show menu with slight delay to prevent context issues
+        player:timer(100, function(playerArg)
+            playerArg:customMenu({
+                title   = menuTitle,
+                options = options,
+            })
+        end)
+    end
+
+    -- Start at page 1
+    showPage(1)
+end
+
+-----------------------------------
+-- LQS.signetEffect
+-- Helper to create Signet effect config for teleporters
+-- Usage: preTeleportEffects = { LQS.signetEffect() }
+-----------------------------------
+LQS.signetEffect = function()
+    return {
+        effect            = xi.effect.SIGNET,
+        removeConflicting = true,
+        duration          = function(player)
+            local pNation = player:getNation()
+            local pRank   = player:getRank(pNation)
+            return (pRank + GetNationRank(pNation) + 3) * 3600
+        end
+    }
+end
+
+-----------------------------------
+-- LQS.teleporter
+-- Config-driven teleporter NPC creation
+-----------------------------------
+LQS.teleporter = function(config)
+    local moduleName = string.format("lqs_teleporter_%s", string.lower(string.gsub(config.name or "unknown", " ", "_")))
+    local m = Module:new(moduleName)
+
+    -- Default configuration
+    local defaults = {
+        itemsPerPage      = 5,
+        teleportDelay     = 1250,
+        greeting          = "Where would you like to go?",
+        noDestinations    = "You haven't unlocked any destinations.",
+        insufficientGil   = "You don't have enough Gil.",
+        insufficientCP    = "You don't have enough conquest points.",
+        cancelled         = "Safe travels!",
+    }
+
+    -- Merge defaults with config
+    for k, v in pairs(defaults) do
+        if config[k] == nil then
+            config[k] = v
+        end
+    end
+
+    m:addOverride(string.format("xi.zones.%s.Zone.onInitialize", config.zone), function(zone)
+        super(zone)
+
+        -- Helper: Apply pre-teleport effects
+        local function applyPreEffects(player)
+            if config.preTeleportEffects then
+                for _, effectInfo in ipairs(config.preTeleportEffects) do
+                    local duration = effectInfo.duration
+                    if type(duration) == "function" then
+                        duration = duration(player)
+                    end
+                    duration = duration or 3600
+
+                    -- Remove conflicting effects if needed (e.g., for Signet)
+                    if effectInfo.removeConflicting then
+                        player:delStatusEffectsByFlag(xi.effectFlag.INFLUENCE, true)
+                    end
+
+                    local power = effectInfo.power or 0
+                    player:addStatusEffect(effectInfo.effect, power, 0, duration)
+                end
+            end
+        end
+
+        -- Helper: Play teleport animation
+        local function playAnimation(player)
+            if config.animation then
+                player:injectActionPacket(
+                    player:getID(),
+                    config.animation.actionID or 6,
+                    config.animation.animID or 600,
+                    0, 0, 0, 0, 0
+                )
+            end
+        end
+
+        -- Helper: Execute teleport
+        local function executeTeleport(player, destination)
+            applyPreEffects(player)
+            playAnimation(player)
+
+            player:timer(config.teleportDelay, function(playerArg)
+                if destination.teleport then
+                    if type(destination.teleport) == "number" then
+                        playerArg:addStatusEffectEx(
+                            xi.effect.TELEPORT, 0,
+                            destination.teleport, 0, 1, 0,
+                            destination.region or 0
+                        )
+                    elseif type(destination.teleport) == "table" then
+                        playerArg:setPos(unpack(destination.teleport))
+                    end
+                elseif destination.pos then
+                    if destination.pos[5] ~= nil then
+                        playerArg:setPos(destination.pos[1], destination.pos[2], destination.pos[3], destination.pos[4], destination.pos[5])
+                    else
+                        playerArg:setPos(destination.pos[1], destination.pos[2], destination.pos[3], destination.pos[4])
+                    end
+                end
+            end)
+        end
+
+        -- Helper: Show payment menu
+        local function showPaymentMenu(player, npc, destination)
+            local gilCost = destination.costs and destination.costs.gil or 0
+            local cpCost  = destination.costs and destination.costs.cp or 0
+
+            local options = {}
+
+            -- Gil option
+            if gilCost > 0 then
+                table.insert(options, {
+                    string.format("Pay %d Gil", gilCost),
+                    function(playerArg)
+                        if playerArg:getGil() >= gilCost then
+                            playerArg:delGil(gilCost)
+                            executeTeleport(playerArg, destination)
+                        else
+                            playerArg:printToPlayer(config.insufficientGil, 0, npc:getPacketName())
+                        end
+                    end
+                })
+            end
+
+            -- CP option
+            if cpCost > 0 then
+                table.insert(options, {
+                    string.format("Pay %d CP", cpCost),
+                    function(playerArg)
+                        if playerArg:getCP() >= cpCost then
+                            playerArg:delCP(cpCost)
+                            executeTeleport(playerArg, destination)
+                        else
+                            playerArg:printToPlayer(config.insufficientCP, 0, npc:getPacketName())
+                        end
+                    end
+                })
+            end
+
+            -- Free teleport (no costs defined)
+            if gilCost == 0 and cpCost == 0 then
+                executeTeleport(player, destination)
+                return
+            end
+
+            -- Cancel option
+            table.insert(options, {
+                "Cancel",
+                function(playerArg)
+                    playerArg:printToPlayer(config.cancelled, 0, npc:getPacketName())
+                end
+            })
+
+            player:timer(100, function(playerArg)
+                playerArg:customMenu({
+                    title   = string.format("Teleport to %s", destination.name),
+                    options = options,
+                })
+            end)
+        end
+
+        -- Filter function for destinations
+        local function filterDestination(player, dest)
+            -- Level check
+            if dest.level and player:getMainLvl() < dest.level then
+                return false
+            end
+
+            -- Custom check function
+            if dest.check and not dest.check(player) then
+                return false
+            end
+
+            return true
+        end
+
+        -- Insert the NPC
+        zone:insertDynamicEntity({
+            objtype    = xi.objType.NPC,
+            name       = config.name,
+            packetName = config.packetName or config.name,
+            look       = config.look,
+            x          = config.pos[1],
+            y          = config.pos[2],
+            z          = config.pos[3],
+            rotation   = config.pos[4] or 0,
+            widescan   = 1,
+
+            onTrigger = function(player, npc)
+                npc:lookAt(player:getPos())
+
+                if config.greeting then
+                    player:printToPlayer(config.greeting, xi.msg.channel.SYSTEM_3)
+                end
+
+                -- Use paginated menu
+                LQS.paginatedMenu(player, {
+                    title        = config.menuTitle or "Select Destination",
+                    items        = config.destinations,
+                    itemsPerPage = config.itemsPerPage,
+                    filter       = filterDestination,
+                    npc          = npc,
+                    onSelect     = function(playerArg, destination, npcArg)
+                        showPaymentMenu(playerArg, npcArg, destination)
+                    end,
+                    onCancel     = function(playerArg, reason)
+                        if reason == "no_items" then
+                            playerArg:printToPlayer(config.noDestinations, 0, npc:getPacketName())
+                        else
+                            playerArg:printToPlayer(config.cancelled, 0, npc:getPacketName())
+                        end
+                    end,
+                })
+            end,
+        })
+    end)
+
+    return m
+end
+
+-----------------------------------
+-- LQS.outpostTeleporter
+-- Pre-configured outpost warper template
+-----------------------------------
+LQS.outpostTeleporter = function(config)
+    -- Standard outpost table with costs and requirements
+    local outpostTable = {
+        [xi.region.RONFAURE]         = { gil = 100, cp = 10,  level = 10, name = "Ronfaure" },
+        [xi.region.ZULKHEIM]         = { gil = 100, cp = 30,  level = 10, name = "Zulkheim" },
+        [xi.region.NORVALLEN]        = { gil = 150, cp = 40,  level = 15, name = "Norvallen" },
+        [xi.region.GUSTABERG]        = { gil = 100, cp = 10,  level = 10, name = "Gustaberg" },
+        [xi.region.DERFLAND]         = { gil = 150, cp = 40,  level = 15, name = "Derfland" },
+        [xi.region.SARUTABARUTA]     = { gil = 100, cp = 10,  level = 10, name = "Sarutabaruta" },
+        [xi.region.KOLSHUSHU]        = { gil = 100, cp = 40,  level = 10, name = "Kolshushu" },
+        [xi.region.ARAGONEU]         = { gil = 150, cp = 40,  level = 15, name = "Aragoneu" },
+        [xi.region.FAUREGANDI]       = { gil = 350, cp = 70,  level = 35, name = "Fauregandi" },
+        [xi.region.VALDEAUNIA]       = { gil = 400, cp = 50,  level = 40, name = "Valdeaunia" },
+        [xi.region.QUFIMISLAND]      = { gil = 150, cp = 60,  level = 15, name = "Qufim" },
+        [xi.region.LITELOR]          = { gil = 250, cp = 40,  level = 25, name = "Li'Telor" },
+        [xi.region.KUZOTZ]           = { gil = 300, cp = 70,  level = 30, name = "Kuzotz" },
+        [xi.region.VOLLBOW]          = { gil = 500, cp = 70,  level = 50, name = "Vollbow" },
+        [xi.region.ELSHIMO_LOWLANDS] = { gil = 250, cp = 70,  level = 25, name = "Elshimo Lowlands" },
+        [xi.region.ELSHIMO_UPLANDS]  = { gil = 350, cp = 70,  level = 35, name = "Elshimo Uplands" },
+        [xi.region.TAVNAZIANARCH]    = { gil = 300, cp = 70,  level = 30, name = "Tavnazia" },
+    }
+
+    -- Allow config to override outpost costs
+    if config.outpostOverrides then
+        for region, overrides in pairs(config.outpostOverrides) do
+            if outpostTable[region] then
+                for k, v in pairs(overrides) do
+                    outpostTable[region][k] = v
+                end
+            end
+        end
+    end
+
+    -- Build destinations from outpost table
+    local destinations = {}
+    for region, data in pairs(outpostTable) do
+        table.insert(destinations, {
+            name     = data.name,
+            teleport = xi.teleport.id.OUTPOST,
+            region   = region,
+            costs    = { gil = data.gil, cp = data.cp },
+            level    = data.level,
+            check    = function(player)
+                if region == xi.region.TAVNAZIANARCH then
+                    -- Tavnazia requires rank 6
+                    return player:getRank(player:getNation()) >= 6
+                elseif region == xi.region.QUFIMISLAND then
+                    -- Qufim is accessible to everyone
+                    return true
+                else
+                    return player:hasTeleport(player:getNation(), region + 5)
+                end
+            end,
+        })
+    end
+
+    -- Sort by region ID for consistent ordering
+    table.sort(destinations, function(a, b)
+        return a.region < b.region
+    end)
+
+    -- Set destinations in config
+    config.destinations = destinations
+
+    -- preTeleportEffects is optional - use LQS.signetEffect() to add Signet
+    -- Example: preTeleportEffects = { LQS.signetEffect() }
+
+    -- Set default animation if not specified
+    if config.animation == nil then
+        config.animation = { actionID = 6, animID = 600 }
+    end
+
+    -- Set default greeting if not specified
+    if config.greeting == nil then
+        config.greeting = "Welcome to the Outpost Warp Service!"
+    end
+
+    return LQS.teleporter(config)
 end
 
 -----------------------------------
