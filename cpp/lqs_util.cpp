@@ -280,7 +280,7 @@ class LqsUtilModule : public CPPModule
             PEntity->status = status;
         };
 
-        lua["CBaseEntity"]["setLookString"] = [](CLuaBaseEntity* PLuaBaseEntity, const std::string lookString) -> void {
+        lua["CBaseEntity"]["setLookString"] = [](CLuaBaseEntity* PLuaBaseEntity, const std::string& lookString) -> void {
             CBaseEntity* PEntity = PLuaBaseEntity->GetBaseEntity();
             PEntity->look = stringToLook(lookString);
 
