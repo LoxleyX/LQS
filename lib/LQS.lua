@@ -2359,9 +2359,6 @@ LQS.outpostTeleporter = function(config)
                 if region == xi.region.TAVNAZIANARCH then
                     -- Tavnazia requires rank 6
                     return player:getRank(player:getNation()) >= 6
-                elseif region == xi.region.QUFIMISLAND then
-                    -- Qufim is accessible to everyone
-                    return true
                 else
                     return player:hasTeleport(player:getNation(), region + 5)
                 end
