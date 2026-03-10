@@ -698,6 +698,23 @@ LQS.lootPool = function(player, pools)
     end
 end
 
+-----------------------------------
+-- Treasure Pool (for party lotting)
+-----------------------------------
+LQS.treasurePool = function(player, pools, source)
+    for _, pool in pairs(pools) do
+        local result = LQS.pickItem(pool)
+
+        if result == nil then
+            print(fmt("[LQS] pickItem returned a nil result in treasure pool (Player: {}, Zone: {})", player:getName(), player:getZoneName()))
+        elseif result[2] == nil then
+            print(fmt("[LQS] pickItem returned a nil item ID in treasure pool (Player: {}, Zone: {})", player:getName(), player:getZoneName()))
+        elseif result[2] ~= 0 then
+            player:addTreasure(result[2], source)
+        end
+    end
+end
+
 LQS.randomNoRepeat = function(size, exclude)
     local range = {}
 
