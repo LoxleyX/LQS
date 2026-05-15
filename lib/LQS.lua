@@ -2911,7 +2911,7 @@ local function entitySetup(dynamicEntity, tbl, entity)
             mob:setMobMod(xi.mobMod.CHARMABLE,    0)
             mob:setMobMod(xi.mobMod.ALLI_HATE,   30)
 
-            if entity.aeffect ~= nil then
+            if entity.aeffect ~= nil or entity.onAdditionalEffect ~= nil then
                 mob:setMobMod(xi.mobMod.ADD_EFFECT, 1)
             end
 
@@ -2952,9 +2952,19 @@ local function entitySetup(dynamicEntity, tbl, entity)
             end
         end
 
-        if entity.onMobRoam ~= nil then
-            dynamicEntity.onMobRoam = function(mob)
+        dynamicEntity.onMobRoam = function(mob)
+            if entity.onMobRoam ~= nil then
                 entity.onMobRoam(mob)
+            end
+
+            if mob:getLocalVar("disengaged") > 0 then
+                DespawnMob(mob:getID())
+            end
+        end
+
+        if entity.onAdditionalEffect ~= nil then
+            dynamicEntity.onAdditionalEffect = function(mob, target, damage)
+                return entity.onAdditionalEffect(mob, target, damage)
             end
         end
 
