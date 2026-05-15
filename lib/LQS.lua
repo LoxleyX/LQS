@@ -2825,6 +2825,14 @@ local getMobSteps = function(event, var, entity, steps, entities)
             end)
         end
 
+        -- Chest: spawn personal loot chest on mob death
+        if entity.chest ~= nil then
+            local chestName = string.gsub(entity.name, " ", "_") .. "_Chest"
+            cexi.loot_chest.spawn(mob, player, chestName, {
+                modifier = entity.chest.modifier and entity.chest.modifier(mob) or 0,
+            })
+        end
+
         if entity.after ~= nil then
             entity.after(mob, player)
         end
@@ -2870,7 +2878,16 @@ end
 local function entitySetup(dynamicEntity, tbl, entity)
     local questName = string.lower(tbl.info.name)
 
-    if
+    -- Chest NPCs get raw onTrigger (bypass step system)
+    if entity._isChest then
+        local chestName = entity.name
+        local chestLoot = entity._chestLoot
+
+        dynamicEntity.onTrigger = function(player, npc)
+            cexi.loot_chest.open(player, npc, chestLoot, chestName)
+        end
+
+    elseif
         entity.type == xi.objType.NPC or
         entity.marker ~= nil
     then
@@ -3144,6 +3161,32 @@ LQS.add = function(source, tbl)
             else
                 table.insert(LQS.registry[registryName].reward, tbl.info.reward)
             end
+        end
+    end
+
+    -----------------------------------
+    -- Auto-create chest NPCs for mobs with chest = { loot = {...} }
+    -----------------------------------
+    for zoneName, zoneEntities in pairs(tbl.entities) do
+        local chests = {}
+        for _, entity in pairs(zoneEntities) do
+            if entity.type == xi.objType.MOB and entity.chest ~= nil then
+                local chestName = string.gsub(entity.name, " ", "_") .. "_Chest"
+                table.insert(chests, {
+                    name       = chestName,
+                    packetName = entity.chest.name or "Treasure Chest",
+                    type       = xi.objType.NPC,
+                    look       = entity.chest.look or 966,
+                    pos        = { 1, 1, 1, 0 },
+                    hidden     = true,
+                    hidename   = true,
+                    _isChest   = true,
+                    _chestLoot = entity.chest.loot,
+                })
+            end
+        end
+        for _, chest in ipairs(chests) do
+            table.insert(zoneEntities, chest)
         end
     end
 
