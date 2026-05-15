@@ -2890,13 +2890,23 @@ local function entitySetup(dynamicEntity, tbl, entity)
             dynamicEntity.mixins = entity.mixins
         end
 
-        dynamicEntity.onMobDeath     = getMobSteps("onMobDeath", tbl.info.var, entity, tbl.steps, tbl.entities)
-        dynamicEntity.onMobDisengage = function(mob)
-            DespawnMob(mob:getID())
+        dynamicEntity.modelSize = entity.size
+        dynamicEntity.modelHitboxSize = entity.hitbox
+
+        dynamicEntity.onMobDeath = getMobSteps("onMobDeath", tbl.info.var, entity, tbl.steps, tbl.entities)
+
+        if entity.onMobDisengage ~= nil then
+            dynamicEntity.onMobDisengage = function(mob)
+                entity.onMobDisengage(mob)
+            end
+        else
+            dynamicEntity.onMobDisengage = function(mob)
+                DespawnMob(mob:getID())
+            end
         end
 
         dynamicEntity.onMobInitialize = function(mob)
-            mob:setMobMod(xi.mobMod.DETECTION, 0x08)
+            mob:setMobMod(xi.mobMod.DETECTION, entity.detection or 0x08)
             mob:setMobMod(xi.mobMod.CHECK_AS_NM,  1)
             mob:setMobMod(xi.mobMod.CHARMABLE,    0)
             mob:setMobMod(xi.mobMod.ALLI_HATE,   30)
