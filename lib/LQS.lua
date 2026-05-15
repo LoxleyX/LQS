@@ -890,7 +890,7 @@ local function spawnMob(player, npc, entities, mobName, params)
                 params ~= nil and
                 params.setPos ~= nil
             then
-                mob:setSpawn(params.setPos.x, params.setPos.y, params.setPos.z, params.setPos.rotation)
+                mob:setSpawn(params.setPos.x, params.setPos.y, params.setPos.z, params.setPos.rot)
             else
                 mob:setSpawn(mobInfo.pos[1], mobInfo.pos[2], mobInfo.pos[3], mobInfo.pos[4])
             end
