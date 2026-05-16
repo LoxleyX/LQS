@@ -3085,6 +3085,87 @@ m:addOverride("xi.caskets.spawnCasket", function(player, mob, x, y, z, r)
 end)
 
 -----------------------------------
+-- LQS.npc - Standalone NPC (no quest steps)
+-----------------------------------
+LQS.npc = function(source, entity)
+    local zoneName = entity.area
+
+    local flags = entity.flags or 0
+    if entity.large then
+        flags = bit.bor(flags, 0x04)
+    end
+
+    local dynamicEntity =
+    {
+        name        = entity.name,
+        packetName  = entity.packetName or entity.name,
+        objtype     = xi.objType.NPC,
+        namevis     = entity.namevis or 0,
+        entityFlags = flags,
+        x           = entity.pos[1],
+        y           = entity.pos[2],
+        z           = entity.pos[3],
+        rotation    = entity.pos[4] or 0,
+        widescan    = 1,
+        onTrigger   = entity.onTrigger,
+        onTrade     = entity.onTrade,
+    }
+
+    if entity.look ~= nil then
+        dynamicEntity.look = entity.look
+    end
+
+    -- Live reload (re-register handlers on file reload)
+    if
+        xi ~= nil and
+        xi.zones ~= nil and
+        xi.zones[zoneName] ~= nil and
+        xi.zones[zoneName].npcs ~= nil
+    then
+        local de = xi.zones[zoneName].npcs["DE_" .. entity.name]
+
+        if de ~= nil then
+            local lookupName = "DE_" .. entity.name
+            local cacheEntry = xi.zones[zoneName].npcs[lookupName]
+
+            if entity.onTrigger then
+                cacheEntry.onTrigger = entity.onTrigger
+            end
+
+            if entity.onTrade then
+                cacheEntry.onTrade = entity.onTrade
+            end
+
+            local underscoreZoneName = string.gsub(zoneName, "-", "_")
+            local zone = GetZone(xi.zone[string.upper(underscoreZoneName)])
+
+            if zone ~= nil then
+                local result = zone:queryEntitiesByName("DE_" .. entity.name)
+                if result ~= nil then
+                    for _, npc in pairs(result) do
+                        npc:setPos(entity.pos[1], entity.pos[2], entity.pos[3], entity.pos[4])
+                        if type(entity.look) == "string" then
+                            npc:setLookString(entity.look)
+                        elseif entity.look ~= nil then
+                            npc:setModelId(entity.look)
+                        end
+                        entityAfter(npc, entity)
+                    end
+                end
+            end
+        end
+    end
+
+    -- First time load
+    source:addOverride(string.format("xi.zones.%s.Zone.onInitialize", zoneName), function(zone)
+        super(zone)
+
+        local de = zone:insertDynamicEntity(dynamicEntity)
+        entityAfter(de, entity)
+    end)
+end
+
+-----------------------------------
 -- LQS.add - Initialise new quest
 -----------------------------------
 local function getStepHint(tbl, step, entityZone, entityType)
