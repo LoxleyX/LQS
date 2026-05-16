@@ -3008,8 +3008,8 @@ local function entityAfter(de, entity)
         de:setStatus(xi.status.DISAPPEAR)
     end
 
-    if entity.hidename ~= nil then
-        de:hideName(entity.hidename)
+    if entity.hideName ~= nil then
+        de:hideName(entity.hideName)
     end
 
     -- Hide names and HP for side-quest/sparkle markers
@@ -3018,12 +3018,12 @@ local function entityAfter(de, entity)
         de:hideHP(true)
     end
 
-    if entity.hidehp ~= nil then
-        de:hideHP(entity.hidehp)
+    if entity.hideHP ~= nil then
+        de:hideHP(entity.hideHP)
     end
 
-    if entity.notarget ~= nil then
-        de:setUntargetable(entity.notarget)
+    if entity.untargetable ~= nil then
+        de:setUntargetable(entity.untargetable)
     end
 
     if
@@ -3179,7 +3179,7 @@ LQS.add = function(source, tbl)
                     look       = entity.chest.look or 966,
                     pos        = { 1, 1, 1, 0 },
                     hidden     = true,
-                    hidename   = true,
+                    hideName   = true,
                     _isChest   = true,
                     _chestLoot = entity.chest.loot,
                 })
@@ -3225,13 +3225,18 @@ LQS.add = function(source, tbl)
                     printf("[LQS] Added entity %s to %s (%s)", entity.name, zoneName, tbl.info.name)
                 end
 
+                local flags = entity.flags or 0
+                if entity.large then
+                    flags = bit.bor(flags, 0x04)
+                end
+
                 local dynamicEntity =
                 {
                     name        = entity.name,
                     packetName  = entity.packetName or entity.name,
                     objtype     = entity.type or xi.objType.NPC,
                     namevis     = entity.namevis or 0,
-                    entityFlags = entity.flags or 0,
+                    entityFlags = flags,
                     x           = entity.pos[1],
                     y           = entity.pos[2],
                     z           = entity.pos[3],
