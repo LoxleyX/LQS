@@ -61,6 +61,10 @@ LQS.standardImmunities =
     xi.immunity.TERROR,
 }
 
+-- Entity size
+LQS.LARGE       = 2
+LQS.EXTRA_LARGE = 3
+
 -- Rates
 LQS.GUARANTEED  = 1000 -- 100%
 LQS.VERY_COMMON =  240 --  24%
@@ -2787,7 +2791,7 @@ LQS.npc = function(source, entity)
     local zoneName = entity.area
 
     local flags = entity.flags or 0
-    if entity.large then
+    if entity.size and entity.size >= LQS.LARGE then
         flags = bit.bor(flags, 0x04)
     end
 
@@ -3003,7 +3007,7 @@ LQS.add = function(source, tbl)
                 end
 
                 local flags = entity.flags or 0
-                if entity.large then
+                if entity.size and entity.size >= LQS.LARGE then
                     flags = bit.bor(flags, 0x04)
                 end
 

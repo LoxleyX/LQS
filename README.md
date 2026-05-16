@@ -345,7 +345,13 @@ LQS.npc(m, {
 return m
 ```
 
-Supports all entity properties: `hideName`, `hideHP`, `untargetable`, `large`, `hidden`, `listener(s)`, `animation`.
+Supports all entity properties: `hideName`, `hideHP`, `untargetable`, `size`, `hidden`, `listener(s)`, `animation`.
+
+#### Size Constants
+| Constant | Value | Effect |
+|----------|-------|--------|
+| `LQS.LARGE` | 2 | Large model (NPCs: entityFlags bit 2, Mobs: modelSize 2) |
+| `LQS.EXTRA_LARGE` | 3 | Extra large model (Mobs only: modelSize 3) |
 
 ## Extensions
 Extensions live in `lib/LQS/` and add functions to the `LQS` table. They are loaded automatically by the core.
