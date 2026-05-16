@@ -325,6 +325,95 @@ The shop utility presents players with an automatically paginated list and provi
 }),
 ```
 
+## Standalone NPCs
+### LQS.npc
+For NPCs that don't need quest steps — shops, services, teleporters, etc. Supports hot-reloading of handlers on file save.
+
+```lua
+local m = Module:new("my_shop")
+
+LQS.npc(m, {
+    name = "Shop Keeper",
+    area = "Port_Jeuno",
+    pos  = { -22, 0, -77, 128 },
+    look = LQS.look({ race = xi.race.HUME_M, face = LQS.face.A3, body = 21 }),
+    onTrigger = function(player, npc)
+        LQS.event(player, npc, { "Welcome to my shop!" })
+    end,
+})
+
+return m
+```
+
+Supports all entity properties: `hideName`, `hideHP`, `untargetable`, `large`, `hidden`, `listener(s)`, `animation`.
+
+## Extensions
+Extensions live in `lib/LQS/` and add functions to the `LQS` table. They are loaded automatically by the core.
+
+### LQS.teleporter
+Returns an `onTrigger` handler for config-driven teleporter NPCs with paginated menus and currency costs.
+
+```lua
+local m = Module:new("my_teleporter")
+
+LQS.npc(m, {
+    name = "Dimensional Guide",
+    area = "Port_Jeuno",
+    pos  = { 10, 0, -20, 128 },
+    look = 1415,
+    onTrigger = LQS.teleporter({
+        destinations = {
+            { name = "Sanctuary", pos = { -37, 0, -141, 69, 121 }, costs = { gil = 500 }, level = 25 },
+            { name = "Crag of Dem", teleport = xi.teleport.id.DEM, costs = { cp = 100 } },
+        },
+        preTeleportEffects = { LQS.signetEffect() },
+        animation = { actionID = 6, animID = 600 },
+    }),
+})
+
+return m
+```
+
+### LQS.outpostTeleporter
+Pre-configured outpost warper with all 17 regions, unlock checks, and costs.
+
+```lua
+local m = Module:new("my_outpost_warper")
+
+LQS.npc(m, {
+    name = "Outpost Warper",
+    area = "Lower_Jeuno",
+    pos  = { 24.155, -1.0, 45.905, 149 },
+    look = 1415,
+    onTrigger = LQS.outpostTeleporter({
+        preTeleportEffects = { LQS.signetEffect() },
+    }),
+})
+
+return m
+```
+
+### LQS.signetEffect
+Helper for standard Signet effect with rank-based duration. Used with teleporter's `preTeleportEffects`.
+
+```lua
+preTeleportEffects = { LQS.signetEffect() }
+```
+
+### Writing Extensions
+Create a file in `lib/LQS/` that adds functions to the `LQS` table. Extensions are loaded automatically by the module loader (alphabetically after `LQS.lua`).
+
+```lua
+-- lib/LQS/my_extension.lua
+LQS = LQS or {}
+
+LQS.myThing = function(config)
+    return function(player, npc)
+        -- Return an onTrigger handler
+    end
+end
+```
+
 ## History
 This system has been developed over a couple of years by myself and now supports over 130+ live custom quests and content systems.
 
