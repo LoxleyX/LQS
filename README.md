@@ -333,13 +333,17 @@ For NPCs that don't need quest steps — shops, services, teleporters, etc. Supp
 local m = Module:new("my_shop")
 
 LQS.npc(m, {
-    name = "Shop Keeper",
-    area = "Port_Jeuno",
-    pos  = { -22, 0, -77, 128 },
-    look = LQS.look({ race = xi.race.HUME_M, face = LQS.face.A3, body = 21 }),
-    onTrigger = function(player, npc)
-        LQS.event(player, npc, { "Welcome to my shop!" })
-    end,
+    ["Port_Jeuno"] =
+    {
+        {
+            name = "Shop Keeper",
+            pos  = { -22, 0, -77, 128 },
+            look = LQS.look({ race = xi.race.HUME_M, face = LQS.face.A3, body = 21 }),
+            onTrigger = function(player, npc)
+                LQS.event(player, npc, { "Welcome to my shop!" })
+            end,
+        },
+    },
 })
 
 return m
@@ -363,18 +367,22 @@ Returns an `onTrigger` handler for config-driven teleporter NPCs with paginated 
 local m = Module:new("my_teleporter")
 
 LQS.npc(m, {
-    name = "Dimensional Guide",
-    area = "Port_Jeuno",
-    pos  = { 10, 0, -20, 128 },
-    look = 1415,
-    onTrigger = LQS.teleporter({
-        destinations = {
-            { name = "Sanctuary", pos = { -37, 0, -141, 69, 121 }, costs = { gil = 500 }, level = 25 },
-            { name = "Crag of Dem", teleport = xi.teleport.id.DEM, costs = { cp = 100 } },
+    ["Port_Jeuno"] =
+    {
+        {
+            name = "Dimensional Guide",
+            pos  = { 10, 0, -20, 128 },
+            look = 1415,
+            onTrigger = LQS.teleporter({
+                destinations = {
+                    { name = "Sanctuary", pos = { -37, 0, -141, 69, 121 }, costs = { gil = 500 }, level = 25 },
+                    { name = "Crag of Dem", teleport = xi.teleport.id.DEM, costs = { cp = 100 } },
+                },
+                preTeleportEffects = { LQS.signetEffect() },
+                animation = { actionID = 6, animID = 600 },
+            }),
         },
-        preTeleportEffects = { LQS.signetEffect() },
-        animation = { actionID = 6, animID = 600 },
-    }),
+    },
 })
 
 return m
@@ -387,13 +395,17 @@ Pre-configured outpost warper with all 17 regions, unlock checks, and costs.
 local m = Module:new("my_outpost_warper")
 
 LQS.npc(m, {
-    name = "Outpost Warper",
-    area = "Lower_Jeuno",
-    pos  = { 24.155, -1.0, 45.905, 149 },
-    look = 1415,
-    onTrigger = LQS.outpostTeleporter({
-        preTeleportEffects = { LQS.signetEffect() },
-    }),
+    ["Lower_Jeuno"] =
+    {
+        {
+            name = "Outpost Warper",
+            pos  = { 24.155, -1.0, 45.905, 149 },
+            look = 1415,
+            onTrigger = LQS.outpostTeleporter({
+                preTeleportEffects = { LQS.signetEffect() },
+            }),
+        },
+    },
 })
 
 return m

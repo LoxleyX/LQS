@@ -2786,10 +2786,14 @@ end)
 
 -----------------------------------
 -- LQS.npc - Standalone NPC (no quest steps)
+-- Usage:
+--   LQS.npc(m, {
+--       ["Zone_Name"] = {
+--           { name = "NPC", look = 1234, pos = { x, y, z, rot }, onTrigger = func },
+--       },
+--   })
 -----------------------------------
-LQS.npc = function(source, entity)
-    local zoneName = entity.area
-
+local function registerNpc(source, zoneName, entity)
     local flags = entity.flags or 0
     if entity.size and entity.size >= LQS.LARGE then
         flags = bit.bor(flags, 0x04)
@@ -2863,6 +2867,14 @@ LQS.npc = function(source, entity)
         local de = zone:insertDynamicEntity(dynamicEntity)
         entityAfter(de, entity)
     end)
+end
+
+LQS.npc = function(source, tbl)
+    for zoneName, entityList in pairs(tbl) do
+        for _, entity in pairs(entityList) do
+            registerNpc(source, zoneName, entity)
+        end
+    end
 end
 
 -----------------------------------
