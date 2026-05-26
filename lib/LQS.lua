@@ -23,6 +23,7 @@ local m = Module:new("LQS_Loxley_Quest_System")
 -- Define globally for reloads and persistence between files
 LQS          = LQS or {}
 LQS.registry = LQS.registry or {}
+LQS.VERSION  = "2.2.0"
 
 LQS.settings =
 {
@@ -1041,6 +1042,51 @@ local function delaySpawn(player, npc, delay, mobs, entities, hideSpawner, param
 end
 
 -----------------------------------
+-- Container / slot names
+-----------------------------------
+local bagNames =
+{
+    [xi.inv.INVENTORY]  = "Inventory",
+    [xi.inv.MOGSAFE]    = "Mog Safe",
+    [xi.inv.STORAGE]    = "Storage",
+    [xi.inv.TEMPITEMS]  = "Temp. Items",
+    [xi.inv.MOGLOCKER]  = "Mog Locker",
+    [xi.inv.MOGSATCHEL] = "Mog Satchel",
+    [xi.inv.MOGSACK]    = "Mog Sack",
+    [xi.inv.MOGCASE]    = "Mog Case",
+    [xi.inv.WARDROBE]   = "Mog Wardrobe 1",
+    [xi.inv.MOGSAFE2]   = "Mog Safe 2",
+    [xi.inv.WARDROBE2]  = "Mog Wardrobe 2",
+    [xi.inv.WARDROBE3]  = "Mog Wardrobe 3",
+    [xi.inv.WARDROBE4]  = "Mog Wardrobe 4",
+    [xi.inv.WARDROBE5]  = "Mog Wardrobe 5",
+    [xi.inv.WARDROBE6]  = "Mog Wardrobe 6",
+    [xi.inv.WARDROBE7]  = "Mog Wardrobe 7",
+    [xi.inv.WARDROBE8]  = "Mog Wardrobe 8",
+    [xi.inv.RECYCLEBIN] = "Recycle Bin",
+}
+
+-----------------------------------
+-- Increase a player's container size
+-- Usage: LQS.rewardSlots(player, { xi.inv.WARDROBE4, 2 })
+--   or in a reward table: slots = { xi.inv.WARDROBE4, 2 }
+-----------------------------------
+LQS.rewardSlots = function(player, unlock)
+    local bag         = unlock[1]
+    local bagIncrease = unlock[2]
+    local bagName     = bagNames[bag] or "Unknown"
+
+    local oldSize = player:getContainerSize(bag)
+    player:changeContainerSize(bag, bagIncrease)
+    local newSize = player:getContainerSize(bag)
+
+    player:sys(
+        "\129\154 Your {} capacity has been increased by {} from {} to {}! \129\154",
+        bagName, bagIncrease, oldSize, newSize
+    )
+end
+
+-----------------------------------
 -- Reward utils
 -----------------------------------
 local function giveReward(player, reward, questName)
@@ -1087,6 +1133,10 @@ local function giveReward(player, reward, questName)
         else
             npcUtil.giveKeyItem(player, reward.keyitem)
         end
+    end
+
+    if reward.slots ~= nil then
+        LQS.rewardSlots(player, reward.slots)
     end
 
     -- Execute optional quest registry override
@@ -2913,12 +2963,13 @@ LQS.add = function(source, tbl)
         local registryName = string.lower(tbl.info.name)
         local entry =
         {
-            name   = tbl.info.name,
-            author = tbl.info.author,
-            var    = tbl.info.var,
-            finish = #tbl.steps - 1,
-            hint   = {},
-            reward = {},
+            name    = tbl.info.name,
+            author  = tbl.info.author,
+            var     = tbl.info.var,
+            finish  = #tbl.steps - 1,
+            hint    = {},
+            reward  = {},
+            feature = nil,
         }
 
         -- Reuse existing overrides to prevent them being wiped on reload
@@ -2944,15 +2995,46 @@ LQS.add = function(source, tbl)
         end
 
         if tbl.info.reward ~= nil then
+            local features = {}
+
+            local function collectFeatures(rewardInfo)
+                if type(rewardInfo) ~= "table" then return end
+
+                -- Explicit feature (string or table of strings)
+                if rewardInfo.feature then
+                    if type(rewardInfo.feature) == "table" then
+                        for _, f in ipairs(rewardInfo.feature) do
+                            table.insert(features, f)
+                        end
+                    else
+                        table.insert(features, rewardInfo.feature)
+                    end
+                end
+
+                -- Auto-infer from slots
+                if rewardInfo.slots then
+                    local bag     = rewardInfo.slots[1]
+                    local amount  = rewardInfo.slots[2]
+                    local bagName = bagNames[bag] or "Unknown"
+                    table.insert(features, fmt("{} x{}", bagName, amount))
+                end
+            end
+
             if
                 type(tbl.info.reward) == "table" and
                 tbl.info.reward[1] ~= nil
             then
                 for _, rewardInfo in pairs(tbl.info.reward) do
                     table.insert(LQS.registry[registryName].reward, rewardInfo)
+                    collectFeatures(rewardInfo)
                 end
             else
                 table.insert(LQS.registry[registryName].reward, tbl.info.reward)
+                collectFeatures(tbl.info.reward)
+            end
+
+            if #features > 0 then
+                entry.feature = features
             end
         end
     end

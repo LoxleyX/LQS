@@ -150,7 +150,7 @@ Dialog steps are the foundation of any quest, each dialog includes an event tabl
     quest  = "Quest Name",
 
      -- (Optional) Setting this will complete the quest after the dialog completes
-    reward = { item = xi.item.CHUNK_OF_ROCK_SALT, gil = 100 },
+    reward = { item = xi.item.CHUNK_OF_ROCK_SALT, gil = 100, slots = { xi.inv.WARDROBE4, 1 }, feature = "Storage: Ephemeral Box" },
 
     -- (Optional) Set the NPC's name here if the entity is a spawner
     spawn  = "NPC Name",
