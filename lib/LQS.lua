@@ -23,7 +23,7 @@ local m = Module:new("LQS_Loxley_Quest_System")
 -- Define globally for reloads and persistence between files
 LQS          = LQS or {}
 LQS.registry = LQS.registry or {}
-LQS.VERSION  = "2.2.0"
+LQS.VERSION  = "2.3.0"
 
 LQS.settings =
 {
@@ -2959,17 +2959,19 @@ LQS.add = function(source, tbl)
     -----------------------------------
     -- Create quest registry for !quest command
     -----------------------------------
-    if #tbl.steps > 1 then
+    if #tbl.steps > 0 and not tbl.info.hidden then
         local registryName = string.lower(tbl.info.name)
         local entry =
         {
-            name    = tbl.info.name,
-            author  = tbl.info.author,
-            var     = tbl.info.var,
-            finish  = #tbl.steps - 1,
-            hint    = {},
-            reward  = {},
-            feature = nil,
+            name        = tbl.info.name,
+            author      = tbl.info.author,
+            var         = tbl.info.var,
+            finish      = #tbl.steps - 1,
+            hint        = {},
+            reward      = {},
+            feature     = nil,
+            category    = tbl.info.category or "quest",
+            subcategory = tbl.info.subcategory,
         }
 
         -- Reuse existing overrides to prevent them being wiped on reload
