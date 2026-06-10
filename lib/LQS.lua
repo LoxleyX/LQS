@@ -2660,14 +2660,28 @@ local function entitySetup(dynamicEntity, tbl, entity)
         dynamicEntity.modelSize = entity.size
         dynamicEntity.modelHitboxSize = entity.hitbox
 
-        dynamicEntity.onMobDeath = getMobSteps("onMobDeath", tbl.info.var, entity, tbl.steps, tbl.entities)
-
-        if entity.onMobDisengage ~= nil then
-            dynamicEntity.onMobDisengage = function(mob)
-                entity.onMobDisengage(mob)
+        -- Util hook runner: calls all matching util callbacks for a given hook
+        local function runUtils(hookName, ...)
+            if entity.util then
+                for _, util in ipairs(entity.util) do
+                    if util[hookName] then
+                        util[hookName](...)
+                    end
+                end
             end
-        else
-            dynamicEntity.onMobDisengage = function(mob)
+        end
+
+        local stepDeath = getMobSteps("onMobDeath", tbl.info.var, entity, tbl.steps, tbl.entities)
+        dynamicEntity.onMobDeath = function(mob, player, optParams)
+            runUtils("onMobDeath", mob, player)
+            stepDeath(mob, player, optParams)
+        end
+
+        dynamicEntity.onMobDisengage = function(mob)
+            runUtils("onMobDisengage", mob)
+            if entity.onMobDisengage ~= nil then
+                entity.onMobDisengage(mob)
+            else
                 DespawnMob(mob:getID())
             end
         end
@@ -2705,21 +2719,26 @@ local function entitySetup(dynamicEntity, tbl, entity)
                     mob:setMobMod(mobModID, mobModValue)
                 end
             end
+
+            runUtils("onMobInitialize", mob)
         end
 
-        if entity.onMobFight ~= nil then
-            dynamicEntity.onMobFight = function(mob, target)
-                entity.onMobFight(mob, target)
-            end
-        end
-
-        if entity.onMobSpawn ~= nil then
-            dynamicEntity.onMobSpawn = function(mob)
+        dynamicEntity.onMobSpawn = function(mob)
+            runUtils("onMobSpawn", mob)
+            if entity.onMobSpawn then
                 entity.onMobSpawn(mob)
             end
         end
 
+        dynamicEntity.onMobFight = function(mob, target)
+            runUtils("onMobFight", mob, target)
+            if entity.onMobFight then
+                entity.onMobFight(mob, target)
+            end
+        end
+
         dynamicEntity.onMobRoam = function(mob)
+            runUtils("onMobRoam", mob)
             if entity.onMobRoam ~= nil then
                 entity.onMobRoam(mob)
             end
@@ -3064,6 +3083,28 @@ LQS.add = function(source, tbl)
         end
         for _, chest in ipairs(chests) do
             table.insert(zoneEntities, chest)
+        end
+    end
+
+    -----------------------------------
+    -- Auto-create companion entities from mob utils (gyves, safe zones, etc.)
+    -----------------------------------
+    for zoneName, zoneEntities in pairs(tbl.entities) do
+        local utilEntities = {}
+        for _, entity in pairs(zoneEntities) do
+            if entity.type == xi.objType.MOB and entity.util ~= nil then
+                for _, util in ipairs(entity.util) do
+                    if util.entities ~= nil then
+                        local companions = util.entities(entity)
+                        for _, companion in ipairs(companions) do
+                            table.insert(utilEntities, companion)
+                        end
+                    end
+                end
+            end
+        end
+        for _, companion in ipairs(utilEntities) do
+            table.insert(zoneEntities, companion)
         end
     end
 
