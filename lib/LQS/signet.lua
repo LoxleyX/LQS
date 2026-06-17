@@ -5,6 +5,11 @@ require("modules/module_utils")
 -----------------------------------
 local m = Module:new("LQS_signet")
 
+-- Library-only module (defines LQS.signetEffect): register a no-op override
+-- so the module loader does not flag it with "No overrides found in module".
+m:addOverride("xi.dummyFunc", function()
+end)
+
 LQS = LQS or {}
 
 LQS.signetEffect = function()
