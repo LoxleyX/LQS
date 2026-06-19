@@ -262,11 +262,11 @@ LQS.outpostTeleporter = function(config)
             costs    = { gil = data.gil, cp = data.cp },
             level    = data.level,
             check    = function(player)
-                if region == xi.region.TAVNAZIANARCH then
-                    return player:getRank(player:getNation()) >= 6
-                else
-                    return player:hasTeleport(player:getNation(), region + 5)
-                end
+                -- Outpost must be unlocked for this character. The supply-run
+                -- reward sets the region's teleport bit (region + 5); see
+                -- conquest.lua addTeleport. Tavnazia uses the same gate as every
+                -- other region rather than a flat rank requirement.
+                return player:hasTeleport(player:getNation(), region + 5)
             end,
         })
     end
