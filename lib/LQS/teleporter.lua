@@ -5,6 +5,12 @@ require("modules/module_utils")
 -----------------------------------
 local m = Module:new("LQS_teleporter")
 
+-- Library-only module (defines LQS.teleporter / LQS.outpostTeleporter): register
+-- a no-op override so the module loader does not flag it with
+-- "No overrides found in module".
+m:addOverride("xi.dummyFunc", function()
+end)
+
 LQS = LQS or {}
 
 -- Returns an onTrigger handler for use with LQS.npc.
@@ -256,11 +262,11 @@ LQS.outpostTeleporter = function(config)
             costs    = { gil = data.gil, cp = data.cp },
             level    = data.level,
             check    = function(player)
-                if region == xi.region.TAVNAZIANARCH then
-                    return player:getRank(player:getNation()) >= 6
-                else
-                    return player:hasTeleport(player:getNation(), region + 5)
-                end
+                -- Outpost must be unlocked for this character. The supply-run
+                -- reward sets the region's teleport bit (region + 5); see
+                -- conquest.lua addTeleport. Tavnazia uses the same gate as every
+                -- other region rather than a flat rank requirement.
+                return player:hasTeleport(player:getNation(), region + 5)
             end,
         })
     end
